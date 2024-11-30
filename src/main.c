@@ -7,6 +7,7 @@
 
 #include "env.h"
 #include "intents.h"
+#include "levenshtein.h"
 
 struct env_vars vars = {};
 struct Intents *intents = {0};
@@ -37,7 +38,9 @@ void on_message(struct discord *client, const struct discord_message *event) {
         message += 23;
 
         for (int i = 0; i < intents->size; i++) {
-            if (strcmp(message, intents->intents[i]->pattern) == 0) {
+            int distance = levenshtein(message, intents->intents[i]->pattern);
+
+            if (distance <= 2) {
                 unsigned int seed = time(0);
 
                 int responseLen = -1;
