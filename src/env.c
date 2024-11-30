@@ -8,7 +8,7 @@ struct env_vars loadEnvVars() {
     struct env_vars env_vars = {
         .prod = false, .guild_id = 0, .prod_token = "", .dev_token = ""};
 
-    env_load(".", false);
+    env_load("../", false);
 
     char *id = getenv("GUILD_ID");
     sscanf(id, "%" SCNu64, &env_vars.guild_id);

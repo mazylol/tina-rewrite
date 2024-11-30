@@ -77,14 +77,24 @@ void on_message(struct discord *client, const struct discord_message *event) {
         for (int i = 0; i < intents->size; i++) {
             if (strcmp(event->referenced_message->content, intents->intents[i]->pattern) == 0) {
                 addResponse(intents, event->referenced_message->content, event->content);
-                generateJson(intents, "intents.json");
+
+                if (vars.prod) {
+                    generateJson(intents, "/data/intents.json");
+                } else {
+                    generateJson(intents, "../intents.json");
+                }
 
                 return;
             }
         }
 
         addIntent(intents, event->referenced_message->content, (char *[]){event->content, NULL});
-        generateJson(intents, "intents.json");
+
+        if (vars.prod) {
+            generateJson(intents, "/data/intents.json");
+        } else {
+            generateJson(intents, "../intents.json");
+        }
     }
 }
 
@@ -92,7 +102,13 @@ int main() {
     vars = loadEnvVars();
 
     size_t num_intents;
-    struct RawIntents *rawIntents = loadRawIntents("intents.json", &num_intents);
+    struct RawIntents *rawIntents = {0};
+
+    if (vars.prod) {
+        rawIntents = loadRawIntents("/data/intents.json", &num_intents);
+    } else {
+        rawIntents = loadRawIntents("../intents.json", &num_intents);
+    }
 
     intents = init();
 

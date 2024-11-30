@@ -1,0 +1,8 @@
+services:
+  bot:
+    build: .
+    volumes:
+      - persistance:/data
+    restart: always
+volumes:
+  persistance:
