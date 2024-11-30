@@ -41,7 +41,8 @@ void on_message(struct discord *client, const struct discord_message *event) {
                 unsigned int seed = time(0);
 
                 int responseLen = -1;
-                while(intents->intents[i]->responses[++responseLen] != NULL) {}
+                while (intents->intents[i]->responses[++responseLen] != NULL) {
+                }
 
                 int idx = rand_r(&seed) % responseLen;
 

@@ -1,8 +1,8 @@
 #include "env.h"
 
+#include <dotenv.h>
 #include <stdlib.h>
 #include <string.h>
-#include <dotenv.h>
 
 struct env_vars loadEnvVars() {
     struct env_vars env_vars = {
