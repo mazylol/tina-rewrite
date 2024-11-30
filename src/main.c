@@ -1,48 +1,88 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <concord/discord.h>
-#include <dotenv.h>
 
+#include "env.h"
 #include "intents.h"
 
-struct env_vars {
-    const char *dev_token;
-    const char *prod_token;
-    u64snowflake guild_id;
-    bool prod;
-};
+struct env_vars vars = {};
+struct Intents *intents = {0};
 
-struct env_vars loadEnvVars() {
-    struct env_vars env_vars = {
-        .prod = false, .guild_id = 0, .prod_token = "", .dev_token = ""};
+u64snowflake botId;
 
-    env_load(".", false);
-
-    char *id = getenv("GUILD_ID");
-    sscanf(id, "%" SCNu64, &env_vars.guild_id);
-
-    env_vars.dev_token = getenv("DEV_TOKEN");
-    env_vars.prod_token = getenv("PROD_TOKEN");
-
-    char *prodValue = getenv("PROD");
-
-    if (prodValue == NULL) {
-        env_vars.prod = false;
-        return env_vars;
-    };
-
-    if (strcmp(prodValue, "0") == 0) {
-        env_vars.prod = false;
-    } else if (strcmp(prodValue, "1") == 0) {
-        env_vars.prod = true;
-    }
-
-    return env_vars;
+void on_ready(struct discord *client, const struct discord_ready *event) {
+    botId = event->user->id;
 }
 
-struct env_vars vars = {};
+void on_message(struct discord *client, const struct discord_message *event) {
+    if (event->author->bot) {
+        return;
+    }
+
+    bool botMentioned = false;
+
+    for (int i = 0; i < event->mentions->size; i++) {
+        if (event->mentions->array[i].id == botId) {
+            botMentioned = true;
+            break;
+        }
+    }
+
+    if (botMentioned) {
+        char *message = event->content;
+
+        message += 23;
+
+        for (int i = 0; i < intents->size; i++) {
+            if (strcmp(message, intents->intents[i]->pattern) == 0) {
+                unsigned int seed = time(0);
+
+                int responseLen = -1;
+                while(intents->intents[i]->responses[++responseLen] != NULL) {}
+
+                int idx = rand_r(&seed) % responseLen;
+
+                struct discord_create_message params = {
+                    .content = intents->intents[i]->responses[idx]};
+
+                discord_create_message(client, event->channel_id, &params, NULL);
+
+                return;
+            }
+        }
+
+        struct discord_create_message params = {
+            .content = "I'm sorry, I don't understand."};
+
+        discord_create_message(client, event->channel_id, &params, NULL);
+    } else {
+        u64snowflake msg_id = 0;
+
+        sscanf(event->content, "%" SCNu64, &msg_id);
+
+        if (!msg_id) {
+            if (!event->referenced_message)
+                return;
+
+            msg_id = event->referenced_message->id;
+        }
+
+        for (int i = 0; i < intents->size; i++) {
+            if (strcmp(event->referenced_message->content, intents->intents[i]->pattern) == 0) {
+                addResponse(intents, event->referenced_message->content, event->content);
+                generateJson(intents, "intents.json");
+
+                return;
+            }
+        }
+
+        addIntent(intents, event->referenced_message->content, (char *[]){event->content, NULL});
+        generateJson(intents, "intents.json");
+    }
+}
 
 int main() {
     vars = loadEnvVars();
@@ -50,19 +90,26 @@ int main() {
     size_t num_intents;
     struct RawIntents *rawIntents = loadRawIntents("intents.json", &num_intents);
 
-    struct Intents *intents = init();
+    intents = init();
 
     for (int i = 0; i < num_intents; i++) {
         addIntent(intents, rawIntents[i].pattern, rawIntents[i].responses);
     }
 
-    for (int i = 0; i< num_intents; i++) {
-        if (strcmp(intents->intents[i]->pattern, "test") == 0) {
-            addResponse(intents, "test", "test response");
-        }
+    struct discord *client = {0};
+
+    if (vars.prod) {
+        client = discord_init(vars.prod_token);
+    } else {
+        client = discord_init(vars.dev_token);
     }
 
-    generateJson(intents, "intents.json");
+    discord_add_intents(client, DISCORD_GATEWAY_MESSAGE_CONTENT);
+
+    discord_set_on_ready(client, &on_ready);
+    discord_set_on_message_create(client, &on_message);
+
+    discord_run(client);
 
     freeRawIntents(rawIntents, num_intents);
     freeIntents(intents);
